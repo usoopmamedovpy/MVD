@@ -6,33 +6,45 @@
     <title>Электронная Очередь (Окно 5)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h1, h2 { text-align: center; color: #1a1a1a; }
+        .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
+        h1, h2, h3 { text-align: center; color: #1a1a1a; margin-top: 0; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
         input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
-        button { width: 100%; padding: 14px; background: #0066cc; color: #fff; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        button:hover { background: #0052a3; }
-        .btn-red { background: #cc0000; }
-        .btn-red:hover { background: #a30000; }
-        .btn-green { background: #28a745; }
-        .btn-green:hover { background: #218838; }
+        
+        /* ЦВЕТОВАЯ СИСТЕМА ИЗ ЗАДАНИЯ */
+        .btn-positive { width: 100%; padding: 14px; background: #0066cc; color: #ffffff; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-positive:hover { background: #0052a3; }
+        
+        .btn-negative { width: 100%; padding: 14px; background: #ffffff; color: #0066cc; border: 2px solid #0066cc; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; box-sizing: border-box; }
+        .btn-negative:hover { background: #e6f2ff; }
+        
         .hidden { display: none; }
-        .ticket { background: #e6f2ff; padding: 20px; border-radius: 8px; text-align: center; margin-top: 20px; border: 2px dashed #0066cc; }
-        .code { font-size: 48px; font-weight: bold; color: #0066cc; letter-spacing: 2px; }
-        .queue-list { margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; }
-        .queue-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
-        .status-confirmed { color: #28a745; font-weight: bold; }
-        .status-missed { color: #cc0000; text-decoration: line-through; }
+        .date-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 20px; }
+        .date-btn { background: #0066cc; color: white; border: none; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .date-btn:hover { background: #0052a3; }
+        .date-btn span { font-size: 14px; font-weight: normal; opacity: 0.9; }
+        
+        .info-card { background: #e6f2ff; padding: 20px; border-radius: 8px; border: 2px solid #0066cc; margin-top: 15px; }
+        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #b3d7ff; }
+        .info-row:last-child { border: none; }
+        .info-label { font-weight: bold; color: #004080; }
+        .info-value { font-size: 18px; font-weight: bold; }
+
+        /* Кастомное модальное окно для отмены */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal { background: white; padding: 25px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Очередь: Окно №5</h1>
-    <p style="text-align: center;" id="date-display"></p>
+    <p style="text-align: center; color: #666; font-size: 14px;">МВД ул. Маршала Неделина 11 г.Одинцово</p>
 
-    <div id="register-section">
+    <div id="step-form">
+        <h2>Запись в список</h2>
         <div class="form-group">
             <label>Имя</label>
             <input type="text" id="name" placeholder="Иван" required>
@@ -43,41 +55,199 @@
         </div>
         <div class="form-group">
             <label>Телефон или Email</label>
-            <input type="text" id="contact" placeholder="Для связи" required>
+            <input type="text" id="contact" placeholder="+7 (999) 999-99-99 или email" required>
         </div>
-        <button onclick="register()">Встать в очередь</button>
+        <button class="btn-positive" onclick="requestCode()">Встать в очередь</button>
     </div>
 
-    <div id="ticket-section" class="ticket hidden">
-        <h2>Ваш талон</h2>
-        <p>Номер в очереди:</p>
-        <div class="code" id="ticket-number">0</div>
-        <p><small>Запомните свой номер! Он нужен для подтверждения присутствия.</small></p>
+    <div id="step-verify" class="hidden">
+        <h2>Подтверждение</h2>
+        <p style="text-align: center;" id="verify-tip">Введите код, который пришел на электронную почту/SMS</p>
+        <div class="form-group">
+            <input type="text" id="verify-code" placeholder="0000" style="text-align: center; font-size: 24px; letter-spacing: 5px;">
+        </div>
+        <button class="btn-positive" onclick="verifyCode()">Подтвердить код</button>
+        <button class="btn-negative" onclick="showStep('form')">Назад</button>
     </div>
 
-    <div id="checkin-section" class="queue-list">
-        <h2>Подтверждение присутствия</h2>
-        <input type="number" id="checkin-queue-number" placeholder="Введите ваш номер в очереди (например: 5)">
-        <button class="btn-green" onclick="checkIn('confirmed')">Успел пройти</button>
-        <button class="btn-red" onclick="checkIn('missed')">Не успел (отменить)</button>
+    <div id="step-dates" class="hidden">
+        <h2>Выберите дату приёма</h2>
+        <p style="text-align: center; color: #666;">Нажмите на нужную пятницу для мгновенной записи:</p>
+        <div id="dates-container" class="date-grid"></div>
     </div>
 
-    <div class="queue-list">
-        <h2>Список людей в очереди</h2>
-        <button onclick="loadQueue()" style="background: #6c757d; padding: 8px;">Обновить список</button>
-        <div id="queue-container" style="margin-top: 15px;"></div>
+    <div id="step-active" class="hidden">
+        <h2>Ваша активная запись</h2>
+        <div class="info-card">
+            <div class="info-row"><span class="info-label">Дата приёма:</span><span class="info-value" id="act-date">-</span></div>
+            <div class="info-row"><span class="info-label">Номер в очереди:</span><span class="info-value" id="act-num" style="color: #0066cc; font-size: 24px;">#0</span></div>
+            <div class="info-row"><span class="info-label">Имя Фамилия:</span><span class="info-value" id="act-name">-</span></div>
+        </div>
+        <button class="btn-negative" onclick="openCancelModal()">Отменить запись</button>
+    </div>
+</div>
+
+<div id="cancel-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <h3>Вы уверены?</h3>
+        <p id="modal-text">Вы хотите отменить запись на дату?</p>
+        <div class="modal-buttons">
+            <button class="btn-positive" id="modal-confirm-btn">Да</button>
+            <button class="btn-negative" onclick="closeCancelModal()" style="margin-top: 0;">Нет</button>
+        </div>
     </div>
 </div>
 
 <script>
-    // ⚠️ ВСТАВЬ СЮДА АДРЕС СВОЕГО ВОРКЕРА ИЗ CLOUDFLARE!
+    // ⚠️ ВСТАВЬ СЮДА ССЫЛКУ НА СВОЙ ВОРКЕР!
     const API_URL = "https://mvd-api.mamedova28dilara1985.workers.dev"; 
 
-    function getNextFriday() {
-        const d = new Date();
-        d.setDate(d.getDate() + ((5 + 7 - d.getDay()) % 7 || 7));
-        return d.toISOString().split('T')[0];
+    let validCode = ""; 
+    let tempUserData = {};
+    let activeBookingData = null;
+
+    // Управление экранами
+    function showStep(step) {
+        document.getElementById('step-form').classList.add('hidden');
+        document.getElementById('step-verify').classList.add('hidden');
+        document.getElementById('step-dates').classList.add('hidden');
+        document.getElementById('step-active').classList.add('hidden');
+        document.getElementById('step-' + step).classList.remove('hidden');
     }
 
-    const targetDate = getNextFriday();
-    document.getElementById('date-display').innerText = "Запись на пятницу: " + targetDate;
+    // При старте проверяем, заходил ли юзер раньше
+    async function init() {
+        const savedContact = localStorage.getItem('mvd_contact');
+        if (savedContact) {
+            try {
+                const res = await fetch(${API_URL}/api/check-active?contact=${encodeURIComponent(savedContact)});
+                const data = await res.json();
+                if (data.hasBooking) {
+                    activeBookingData = data.booking;
+                    document.getElementById('act-date').innerText = data.booking.target_date;
+                    document.getElementById('act-num').innerText = "#" + data.booking.queue_number;
+                    document.getElementById('act-name').innerText = data.booking.name + " " + data.booking.surname;
+                    showStep('active');
+                    return;
+                }
+            } catch(e) { console.error(e); }
+        }
+        showStep('form');
+    }
+
+    // Запрос кода (Шаг 1)
+    async function requestCode() {
+        const name = document.getElementById('name').value.trim();
+        const surname = document.getElementById('surname').value.trim();
+        const contact = document.getElementById('contact').value.trim();
+
+        if (!name  !surname  !contact) return alert("Пожалуйста, заполните все поля!");
+
+        tempUserData = { name, surname, contact };
+
+        try {
+            const res = await fetch(${API_URL}/api/request-code, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contact })
+            });
+            const data = await res.json();
+            if (data.success) {
+                validCode = data.debug_code;
+                // Временная плашка-подсказка для тестов, пока нет реального СМС шлюза
+                alert([ТЕСТОВЫЙ РЕЖИМ] Код подтверждения: ${validCode});
+                showStep('verify');
+            }
+        } catch(e) { alert("Ошибка соединения с бэкендом"); }
+    }
+
+    // Проверка кода (Шаг 2)
+    function verifyCode() {
+        const inputCode = document.getElementById('verify-code').value.trim();
+        if (inputCode === validCode) {
+            loadDatesGrid();
+        } else {
+            alert("Неверный код подтверждения! Попробуйте еще раз.");
+        }
+    }
+
+    // Загрузка кнопок 5 пятниц с динамическими номерами (Шаг 3)
+    async function loadDatesGrid() {
+        try {
+            const res = await fetch(${API_URL}/api/dates-info);
+            const dates = await res.json();
+            
+            const container = document.getElementById('dates-container');
+            container.innerHTML = '';
+
+            dates.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = 'date-btn';
+                btn.innerHTML = ${item.btnDate} <span>Вы будете №${item.nextNumber}</span>;
+                btn.onclick = () => bookDate(item.dbDate);
+                container.appendChild(btn);
+            });
+
+            showStep('dates');
+        } catch(e) { alert("Не удалось загрузить сетку дат."); }
+    }
+
+    // Финальная запись на выбранную дату
+    async function bookDate(targetDate) {
+        const payload = { ...tempUserData, target_date: targetDate };
+
+        try {
+            const res = await fetch(${API_URL}/api/book, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                localStorage.setItem('mvd_contact', tempUserData.contact);
+                alert("Вы успешно записаны!");
+                init(); // Перерисовываем экран на карточку активной записи
+            } else {
+                alert("Ошибка: " + data.error);
+            }
+        } catch(e) { alert("Ошибка при бронировании."); }
+    }
+
+    // Логика кастомного модального окна отмены
+    function openCancelModal() {
+        if(!activeBookingData) return;
+        document.getElementById('modal-text').innerText = Вы уверены, что хотите отменить запись на ${activeBookingData.target_date}?;
+        
+        // Вешаем событие на кнопку "Да" внутри модалки
+        document.getElementById('modal-confirm-btn').onclick = confirmCancellation;
+        document.getElementById('cancel-modal').classList.remove('hidden');
+    }
+
+    function closeCancelModal() {
+        document.getElementById('cancel-modal').classList.add('hidden');
+    }
+
+    async function confirmCancellation() {
+        const savedContact = localStorage.getItem('mvd_contact');
+        try {
+            const res = await fetch(${API_URL}/api/cancel, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contact: savedContact, target_date: activeBookingData.target_date })
+            });
+            const data = await res.json();
+            if (data.success) {
+                alert("Запись успешно отменена.");
+                closeCancelModal();
+                localStorage.removeItem('mvd_contact'); // Чистим сессию
+                init(); // Возвращаем на чистую анкету
+            }
+        } catch(e) { alert("Ошибка при отмене записи."); }
+    }
+
+    // Запуск системы
+    init();
+</script>
+</body>
+</html>
