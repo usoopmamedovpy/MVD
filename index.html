@@ -1,27 +1,291 @@
-async function confirmCancel() {
-    const contact = localStorage.getItem('mvd_contact');
-    if (!contact || !activeBooking) return;
-    
-    // Сохраняем данные для повторного заполнения
-    const prevName = activeBooking.name;
-    const prevSurname = activeBooking.surname;
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Электронная Очередь (Окно 5)</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
+        h1, h2, h3 { text-align: center; color: #1a1a1a; margin-top: 0; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
+        
+        /* ОБЩИЙ СТИЛЬ КНОПОК */
+        .btn { width: 100%; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-sizing: border-box; transition: 0.2s; display: block; text-align: center; margin-top: 10px; }
+        .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.7; }
+        
+        .btn-positive { background: #0066cc; color: #ffffff; border: 2px solid #0066cc; }
+        .btn-positive:hover:not(:disabled) { background: #0052a3; border-color: #0052a3; }
+        
+        .btn-negative { background: #ffffff; color: #d93025; border: 2px solid #d93025; }
+        .btn-negative:hover:not(:disabled) { background: #fce8e6; }
+        
+        .hidden { display: none !important; }
+        
+        /* СЕТКА ДАТ */
+        .date-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; margin-bottom: 20px; }
+        .date-btn { background: #f8f9fa; color: #333; border: 2px solid #e0e0e0; padding: 15px; border-radius: 8px; font-size: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
+        .date-btn:hover { border-color: #0066cc; }
+        .date-btn.selected { background: #e6f2ff; border-color: #0066cc; color: #0066cc; font-weight: bold; }
+        .date-btn span { font-size: 14px; font-weight: normal; color: #666; }
+        .date-btn.selected span { color: #0066cc; }
+        
+        /* КАРТОЧКА АКТИВНОЙ ЗАПИСИ */
+        .info-card { background: #e6f2ff; padding: 20px; border-radius: 8px; border: 2px solid #0066cc; margin-top: 15px; margin-bottom: 20px; }
+        .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #b3d7ff; }
+        .info-row:last-child { border: none; padding-bottom: 0; }
+        .info-label { font-weight: bold; color: #004080; }
+        .info-value { font-size: 18px; font-weight: bold; text-align: right; }
 
-    try {
-        const res = await fetch(`${API_URL}/api/cancel`, { ... });
-        const data = await res.json();
+        /* МОДАЛЬНОЕ ОКНО */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+        .modal { background: white; padding: 25px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
+        .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-buttons .btn { margin-top: 0; flex: 1; } /* flex: 1 делает кнопки строго одинаковыми */
+    </style>
+</head>
+<body>
 
-        if (data.success) {
-            localStorage.removeItem('mvd_contact');
-            activeBooking = null;
-            closeCancelModal();
+<div class="container">
+    <h1>Очередь: Окно №5</h1>
+    <p style="text-align: center; color: #666; font-size: 14px; margin-bottom: 25px;">МВД ул. Маршала Неделина 11 г.Одинцово</p>
 
-            // Предзаполняем форму
-            document.getElementById('name').value = prevName;
-            document.getElementById('surname').value = prevSurname;
-            document.getElementById('contact').value = contact;
+    <div id="step-form">
+        <div class="form-group">
+            <label>Имя</label>
+            <input type="text" id="name" placeholder="Иван" required>
+        </div>
+        <div class="form-group">
+            <label>Фамилия</label>
+            <input type="text" id="surname" placeholder="Иванов" required>
+        </div>
+        <div class="form-group">
+            <label>Телефон или Email</label>
+            <input type="text" id="contact" placeholder="+7 (999) 999-99-99 или email" required>
+        </div>
 
-            showFormScreen();
-            await loadDates();
+        <h3 style="margin-top: 25px; text-align: left;">Выберите дату приёма:</h3>
+        <div id="dates-container" class="date-grid">
+            <p style="text-align: center; color: #999;">Загрузка доступных дат...</p>
+        </div>
+
+        <button id="submit-btn" class="btn btn-positive" onclick="bookQueue()" disabled>Выберите дату</button>
+    </div>
+
+    <div id="step-active" class="hidden">
+        <h2>Ваш талон</h2>
+        <div class="info-card">
+            <div class="info-row">
+                <span class="info-label">Номер в очереди:</span>
+                <span class="info-value" id="act-num" style="color: #0066cc; font-size: 28px;">#0</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Имя Фамилия:</span>
+                <span class="info-value" id="act-name">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Контакт:</span>
+                <span class="info-value" id="act-contact" style="font-size: 14px;">-</span>
+            </div>
+            <div class="info-row">
+                <span class="info-label">Дата приёма:</span>
+                <span class="info-value" id="act-date">-</span>
+            </div>
+        </div>
+        <button class="btn btn-negative" onclick="openCancelModal()">Отменить запись</button>
+    </div>
+</div>
+
+<div id="cancel-modal" class="modal-overlay hidden">
+    <div class="modal">
+        <h3>Вы уверены?</h3>
+        <p id="modal-text">Что хотите отменить запись на дату?</p>
+        <div class="modal-buttons">
+            <button class="btn btn-positive" onclick="confirmCancellation()">Да</button>
+            <button class="btn btn-positive" onclick="closeCancelModal()">Нет</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ⚠️ ВСТАВЬ СЮДА ССЫЛКУ НА СВОЙ ВОРКЕР!
+    const API_URL = "https://mvd-api.mamedova28dilara1985.workers.dev"; 
+
+    let selectedDate = null;
+    let selectedNumber = null;
+    let activeBookingData = null;
+
+    // Инициализация при входе на сайт
+    async function init() {
+        const savedContact = localStorage.getItem('mvd_contact');
+        
+        // Если человек уже вводил номер, проверяем, есть ли у него активная запись
+        if (savedContact) {
+            document.getElementById('contact').value = savedContact; // Предзаполняем контакт на будущее
+            try {
+                const res = await fetch(`${API_URL}/api/check-active?contact=${encodeURIComponent(savedContact)}`);
+                const data = await res.json();
+                
+                if (data.hasBooking) {
+                    showActiveTicket(data.booking);
+                    return; // Останавливаем инициализацию формы, показываем билет
+                }
+            } catch(e) { console.error("Ошибка проверки статуса", e); }
+        }
+        
+        // Если записи нет, загружаем даты для формы
+        loadDates();
+    }
+
+    // Загрузка доступных пятниц из бэкенда
+    async function loadDates() {
+        try {
+            const res = await fetch(`${API_URL}/api/dates-info`);
+            const dates = await res.json();
+            
+            const container = document.getElementById('dates-container');
+            container.innerHTML = '';
+
+            dates.forEach(item => {
+                const btn = document.createElement('div');
+                btn.className = 'date-btn';
+                btn.innerHTML = `${item.btnDate} <span>Очередь: ${item.nextNumber} чел.</span>`;
+                btn.onclick = () => selectDate(btn, item.dbDate, item.nextNumber, item.btnDate);
+                container.appendChild(btn);
+            });
+        } catch(e) { 
+            document.getElementById('dates-container').innerHTML = '<p style="color:red; text-align:center;">Ошибка загрузки дат. Обновите страницу.</p>';
         }
     }
-}
+
+    // Логика выбора даты
+    function selectDate(clickedBtn, dbDate, nextNumber, btnDate) {
+        // Убираем выделение со всех кнопок
+        document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('selected'));
+        // Выделяем нажатую
+        clickedBtn.classList.add('selected');
+
+        selectedDate = dbDate;
+        selectedNumber = nextNumber;
+
+        // Меняем текст главной кнопки
+        const submitBtn = document.getElementById('submit-btn');
+        submitBtn.disabled = false;
+        submitBtn.innerText = `Вы будете №${nextNumber}-ым в очереди`;
+    }
+
+    // Отправка формы (Бронирование)
+    async function bookQueue() {
+        const name = document.getElementById('name').value.trim();
+        const surname = document.getElementById('surname').value.trim();
+        const contact = document.getElementById('contact').value.trim();
+
+        if (!name || !surname || !contact) {
+            return alert("Пожалуйста, заполните Имя, Фамилию и Телефон/Email!");
+        }
+        if (!selectedDate) {
+            return alert("Пожалуйста, выберите дату приёма!");
+        }
+
+        const submitBtn = document.getElementById('submit-btn');
+        submitBtn.innerText = "Записываем...";
+        submitBtn.disabled = true;
+
+        try {
+            const res = await fetch(`${API_URL}/api/book`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, surname, contact, target_date: selectedDate })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                // Сохраняем контакт в браузере, чтобы система его узнала при обновлении
+                localStorage.setItem('mvd_contact', contact);
+                
+                // Показываем билет
+                showActiveTicket({
+                    queue_number: data.queue_number,
+                    name: name,
+                    surname: surname,
+                    contact: contact,
+                    target_date: selectedDate
+                });
+            } else {
+                alert("Ошибка: " + data.error);
+                submitBtn.innerText = `Вы будете №${selectedNumber}-ым в очереди`;
+                submitBtn.disabled = false;
+            }
+        } catch(e) { 
+            alert("Ошибка связи с сервером.");
+            submitBtn.innerText = `Вы будете №${selectedNumber}-ым в очереди`;
+            submitBtn.disabled = false;
+        }
+    }
+
+    // Переключение на экран с талоном
+    function showActiveTicket(booking) {
+        activeBookingData = booking;
+        
+        document.getElementById('act-num').innerText = "#" + booking.queue_number;
+        document.getElementById('act-name').innerText = booking.name + " " + booking.surname;
+        document.getElementById('act-contact').innerText = booking.contact || localStorage.getItem('mvd_contact');
+        document.getElementById('act-date').innerText = booking.target_date;
+        
+        document.getElementById('step-form').classList.add('hidden');
+        document.getElementById('step-active').classList.remove('hidden');
+    }
+
+    // Управление модальным окном
+    function openCancelModal() {
+        document.getElementById('modal-text').innerText = `Что хотите отменить запись на ${activeBookingData.target_date}?`;
+        document.getElementById('cancel-modal').classList.remove('hidden');
+    }
+
+    function closeCancelModal() {
+        document.getElementById('cancel-modal').classList.add('hidden');
+    }
+
+    // Логика отмены записи
+    async function confirmCancellation() {
+        const savedContact = localStorage.getItem('mvd_contact');
+        
+        try {
+            const res = await fetch(`${API_URL}/api/cancel`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contact: savedContact, target_date: activeBookingData.target_date })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                closeCancelModal();
+                // Мы НЕ чистим localStorage и поля input, чтобы человек мог сразу выбрать другую дату
+                activeBookingData = null;
+                selectedDate = null;
+                
+                // Возвращаем главную кнопку в исходное состояние
+                const submitBtn = document.getElementById('submit-btn');
+                submitBtn.innerText = "Выберите дату";
+                submitBtn.disabled = true;
+                
+                // Переключаем экраны обратно
+                document.getElementById('step-active').classList.add('hidden');
+                document.getElementById('step-form').classList.remove('hidden');
+                
+                // Обновляем список дат, так как очередь сдвинулась
+                loadDates();
+            }
+        } catch(e) { 
+            alert("Ошибка при отмене записи."); 
+            closeCancelModal();
+        }
+    }
+
+    // Старт
+    init();
+</script>
+</body>
+</html>
