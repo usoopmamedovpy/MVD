@@ -13,8 +13,8 @@
         input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
         
         /* ОБЩИЙ СТИЛЬ КНОПОК */
-        .btn { width: 100%; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-sizing: border-box; transition: 0.2s; display: block; text-align: center; margin-top: 10px; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.7; }
+        .btn { width: 100%; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-sizing: border-box; transition: 0.3s; display: block; text-align: center; margin-top: 10px; }
+        .btn:disabled { background: #ccc !important; border-color: #ccc !important; cursor: not-allowed; opacity: 0.7; }
         
         .btn-positive { background: #0066cc; color: #ffffff; border: 2px solid #0066cc; }
         .btn-positive:hover:not(:disabled) { background: #0052a3; border-color: #0052a3; }
@@ -43,7 +43,7 @@
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .modal { background: white; padding: 25px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
-        .modal-buttons .btn { margin-top: 0; flex: 1; } /* flex: 1 делает кнопки строго одинаковыми */
+        .modal-buttons .btn { margin-top: 0; flex: 1; }
     </style>
 </head>
 <body>
@@ -63,7 +63,7 @@
         </div>
         <div class="form-group">
             <label>Телефон или Email</label>
-            <input type="text" id="contact" placeholder="+7 (999) 999-99-99 или email" required>
+            <input type="text" id="contact" placeholder="+7 (999) 999-99-99" required>
         </div>
 
         <h3 style="margin-top: 25px; text-align: left;">Выберите дату приёма:</h3>
@@ -94,7 +94,7 @@
                 <span class="info-value" id="act-date">-</span>
             </div>
         </div>
-        <button class="btn btn-negative" onclick="openCancelModal()">Отменить запись</button>
+        <button id="cancel-btn" class="btn btn-negative" onclick="openCancelModal()">Отменить запись</button>
     </div>
 </div>
 
@@ -117,29 +117,41 @@
     let selectedNumber = null;
     let activeBookingData = null;
 
-    // Инициализация при входе на сайт
+    // Функция для красивого вывода ошибок прямо на кнопки (вместо зависающих alert)
+    function showErrorOnButton(btnId, defaultText, errorMsg) {
+        const btn = document.getElementById(btnId);
+        btn.innerText = "Ошибка: " + errorMsg;
+        btn.style.background = "#d93025";
+        btn.style.borderColor = "#d93025";
+        btn.style.color = "white";
+        btn.disabled = false;
+        
+        setTimeout(() => {
+            btn.innerText = defaultText;
+            btn.style.background = "";
+            btn.style.borderColor = "";
+            btn.style.color = "";
+            if(defaultText === "Выберите дату" && !selectedDate) btn.disabled = true;
+        }, 4000);
+    }
+
     async function init() {
         const savedContact = localStorage.getItem('mvd_contact');
-        
-        // Если человек уже вводил номер, проверяем, есть ли у него активная запись
         if (savedContact) {
-            document.getElementById('contact').value = savedContact; // Предзаполняем контакт на будущее
+            document.getElementById('contact').value = savedContact;
             try {
                 const res = await fetch(`${API_URL}/api/check-active?contact=${encodeURIComponent(savedContact)}`);
                 const data = await res.json();
                 
                 if (data.hasBooking) {
                     showActiveTicket(data.booking);
-                    return; // Останавливаем инициализацию формы, показываем билет
+                    return; 
                 }
-            } catch(e) { console.error("Ошибка проверки статуса", e); }
+            } catch(e) { console.error("Не удалось проверить активную запись"); }
         }
-        
-        // Если записи нет, загружаем даты для формы
         loadDates();
     }
 
-    // Загрузка доступных пятниц из бэкенда
     async function loadDates() {
         try {
             const res = await fetch(`${API_URL}/api/dates-info`);
@@ -152,7 +164,7 @@
                 const btn = document.createElement('div');
                 btn.className = 'date-btn';
                 btn.innerHTML = `${item.btnDate} <span>Очередь: ${item.nextNumber} чел.</span>`;
-                btn.onclick = () => selectDate(btn, item.dbDate, item.nextNumber, item.btnDate);
+                btn.onclick = () => selectDate(btn, item.dbDate, item.nextNumber);
                 container.appendChild(btn);
             });
         } catch(e) { 
@@ -160,36 +172,30 @@
         }
     }
 
-    // Логика выбора даты
-    function selectDate(clickedBtn, dbDate, nextNumber, btnDate) {
-        // Убираем выделение со всех кнопок
+    function selectDate(clickedBtn, dbDate, nextNumber) {
         document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('selected'));
-        // Выделяем нажатую
         clickedBtn.classList.add('selected');
 
         selectedDate = dbDate;
         selectedNumber = nextNumber;
 
-        // Меняем текст главной кнопки
         const submitBtn = document.getElementById('submit-btn');
         submitBtn.disabled = false;
         submitBtn.innerText = `Вы будете №${nextNumber}-ым в очереди`;
     }
 
-    // Отправка формы (Бронирование)
     async function bookQueue() {
         const name = document.getElementById('name').value.trim();
         const surname = document.getElementById('surname').value.trim();
         const contact = document.getElementById('contact').value.trim();
+        const submitBtn = document.getElementById('submit-btn');
 
         if (!name || !surname || !contact) {
-            return alert("Пожалуйста, заполните Имя, Фамилию и Телефон/Email!");
+            return showErrorOnButton('submit-btn', submitBtn.innerText, "Заполните все поля");
         }
-        if (!selectedDate) {
-            return alert("Пожалуйста, выберите дату приёма!");
-        }
+        if (!selectedDate) return;
 
-        const submitBtn = document.getElementById('submit-btn');
+        const defaultBtnText = `Вы будете №${selectedNumber}-ым в очереди`;
         submitBtn.innerText = "Записываем...";
         submitBtn.disabled = true;
 
@@ -199,36 +205,30 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, surname, contact, target_date: selectedDate })
             });
-            const data = await res.json();
+            
+            // Защита от 500 ошибок (если сервер вернул HTML вместо JSON)
+            const textData = await res.text();
+            let data;
+            try {
+                data = JSON.parse(textData);
+            } catch(e) {
+                throw new Error("Воркер упал (500)");
+            }
 
             if (data.success) {
-                // Сохраняем контакт в браузере, чтобы система его узнала при обновлении
                 localStorage.setItem('mvd_contact', contact);
-                
-                // Показываем билет
-                showActiveTicket({
-                    queue_number: data.queue_number,
-                    name: name,
-                    surname: surname,
-                    contact: contact,
-                    target_date: selectedDate
-                });
+                showActiveTicket({ queue_number: data.queue_number, name, surname, contact, target_date: selectedDate });
             } else {
-                alert("Ошибка: " + data.error);
-                submitBtn.innerText = `Вы будете №${selectedNumber}-ым в очереди`;
-                submitBtn.disabled = false;
+                showErrorOnButton('submit-btn', defaultBtnText, data.error || "Неизвестная ошибка");
             }
         } catch(e) { 
-            alert("Ошибка связи с сервером.");
-            submitBtn.innerText = `Вы будете №${selectedNumber}-ым в очереди`;
-            submitBtn.disabled = false;
+            // Если вылезла ошибка CORS или интернета
+            showErrorOnButton('submit-btn', defaultBtnText, e.message);
         }
     }
 
-    // Переключение на экран с талоном
     function showActiveTicket(booking) {
         activeBookingData = booking;
-        
         document.getElementById('act-num').innerText = "#" + booking.queue_number;
         document.getElementById('act-name').innerText = booking.name + " " + booking.surname;
         document.getElementById('act-contact').innerText = booking.contact || localStorage.getItem('mvd_contact');
@@ -238,7 +238,6 @@
         document.getElementById('step-active').classList.remove('hidden');
     }
 
-    // Управление модальным окном
     function openCancelModal() {
         document.getElementById('modal-text').innerText = `Что хотите отменить запись на ${activeBookingData.target_date}?`;
         document.getElementById('cancel-modal').classList.remove('hidden');
@@ -248,9 +247,10 @@
         document.getElementById('cancel-modal').classList.add('hidden');
     }
 
-    // Логика отмены записи
     async function confirmCancellation() {
         const savedContact = localStorage.getItem('mvd_contact');
+        const modalBtn = document.querySelector('#cancel-modal .btn-positive');
+        modalBtn.innerText = "Отменяем...";
         
         try {
             const res = await fetch(`${API_URL}/api/cancel`, {
@@ -262,29 +262,24 @@
             
             if (data.success) {
                 closeCancelModal();
-                // Мы НЕ чистим localStorage и поля input, чтобы человек мог сразу выбрать другую дату
+                modalBtn.innerText = "Да";
                 activeBookingData = null;
                 selectedDate = null;
                 
-                // Возвращаем главную кнопку в исходное состояние
                 const submitBtn = document.getElementById('submit-btn');
                 submitBtn.innerText = "Выберите дату";
                 submitBtn.disabled = true;
                 
-                // Переключаем экраны обратно
                 document.getElementById('step-active').classList.add('hidden');
                 document.getElementById('step-form').classList.remove('hidden');
-                
-                // Обновляем список дат, так как очередь сдвинулась
                 loadDates();
             }
         } catch(e) { 
-            alert("Ошибка при отмене записи."); 
-            closeCancelModal();
+            modalBtn.innerText = "Ошибка!";
+            setTimeout(() => modalBtn.innerText = "Да", 2000);
         }
     }
 
-    // Старт
     init();
 </script>
 </body>
