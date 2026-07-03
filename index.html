@@ -2,29 +2,25 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Электронная Очередь (Окно 5)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; background: #f0f2f5; margin: 0; padding: 20px; color: #333; }
-        .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; }
+        .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); position: relative; z-index: 10; }
         h1, h2, h3 { text-align: center; color: #1a1a1a; margin-top: 0; }
         .form-group { margin-bottom: 15px; }
         label { display: block; margin-bottom: 5px; font-weight: bold; }
         input { width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; font-size: 16px; }
         
-        /* ОБЩИЙ СТИЛЬ КНОПОК */
         .btn { width: 100%; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-sizing: border-box; transition: 0.3s; display: block; text-align: center; margin-top: 10px; }
         .btn:disabled { background: #ccc !important; border-color: #ccc !important; cursor: not-allowed; opacity: 0.7; }
-        
         .btn-positive { background: #0066cc; color: #ffffff; border: 2px solid #0066cc; }
         .btn-positive:hover:not(:disabled) { background: #0052a3; border-color: #0052a3; }
-        
         .btn-negative { background: #ffffff; color: #d93025; border: 2px solid #d93025; }
         .btn-negative:hover:not(:disabled) { background: #fce8e6; }
         
         .hidden { display: none !important; }
         
-        /* СЕТКА ДАТ */
         .date-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; margin-bottom: 20px; }
         .date-btn { background: #f8f9fa; color: #333; border: 2px solid #e0e0e0; padding: 15px; border-radius: 8px; font-size: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; transition: 0.2s; }
         .date-btn:hover { border-color: #0066cc; }
@@ -32,21 +28,100 @@
         .date-btn span { font-size: 14px; font-weight: normal; color: #666; }
         .date-btn.selected span { color: #0066cc; }
         
-        /* КАРТОЧКА АКТИВНОЙ ЗАПИСИ */
         .info-card { background: #e6f2ff; padding: 20px; border-radius: 8px; border: 2px solid #0066cc; margin-top: 15px; margin-bottom: 20px; }
         .info-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #b3d7ff; }
         .info-row:last-child { border: none; padding-bottom: 0; }
         .info-label { font-weight: bold; color: #004080; }
         .info-value { font-size: 18px; font-weight: bold; text-align: right; }
 
-        /* МОДАЛЬНОЕ ОКНО */
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
         .modal { background: white; padding: 25px; border-radius: 12px; max-width: 400px; width: 90%; text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,0.2); }
         .modal-buttons { display: flex; gap: 10px; margin-top: 20px; }
         .modal-buttons .btn { margin-top: 0; flex: 1; }
+
+        /* ================= РЕКЛАМНЫЕ БАННЕРЫ ================= */
+        .ad-banner {
+            position: fixed;
+            background: #fffbe6;
+            border: 2px dashed #fadb14;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            z-index: 999;
+            text-align: center;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .close-ad {
+            position: absolute;
+            top: 5px;
+            right: 10px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+        }
+        
+        .close-ad:hover { color: #d93025; }
+        
+        .ad-text {
+            font-size: 14px;
+            color: #333;
+            font-weight: bold;
+            transition: opacity 0.5s ease;
+        }
+
+        /* МАЛЕНЬКИЙ ШРИФТ ДЛЯ БРЕДА МАРКЕТОЛОГОВ */
+        .ad-text.small-text {
+            font-size: 10px;
+            font-weight: normal;
+            color: #666;
+            text-align: justify;
+        }
+
+        /* Десктоп (Компьютеры) - По бокам */
+        @media (min-width: 769px) {
+            .ad-banner {
+                width: 160px;
+                height: 80vh;
+                top: 10vh;
+                flex-direction: column;
+            }
+            #ad-1 { left: 20px; }
+            #ad-2 { right: 20px; }
+        }
+
+        /* Мобильные телефоны - Сверху и Снизу */
+        @media (max-width: 768px) {
+            body { padding-top: 70px; padding-bottom: 70px; } /* Отступы, чтобы баннеры не закрыли сайт навсегда */
+            .ad-banner {
+                width: 100%;
+                height: 60px;
+                left: 0;
+                border-left: none;
+                border-right: none;
+            }
+            #ad-1 { top: 0; border-top: none; }
+            #ad-2 { bottom: 0; border-bottom: none; }
+        }
+        /* ===================================================== */
     </style>
 </head>
 <body>
+
+<div id="ad-1" class="ad-banner">
+    <span class="close-ad" onclick="this.parentElement.remove()">×</span>
+    <div class="ad-text" id="ad-text-1">ВАША РЕКЛАМА</div>
+</div>
+
+<div id="ad-2" class="ad-banner">
+    <span class="close-ad" onclick="this.parentElement.remove()">×</span>
+    <div class="ad-text" id="ad-text-2">ЛУЧШИЙ БРЕНД</div>
+</div>
 
 <div class="container">
     <h1>Очередь: Окно №5</h1>
@@ -110,14 +185,53 @@
 </div>
 
 <script>
-    // ⚠️ ВСТАВЬ СЮДА ССЫЛКУ НА СВОЙ ВОРКЕР!
+    // ТВОЙ ВОРКЕР
     const API_URL = "https://mvd-api.mamedova28dilara1985.workers.dev"; 
+
+    // ========= ЛОГИКА СМЕНЫ ТЕКСТА В БАННЕРАХ =========
+    const adTexts = [
+        "Вау!",
+        "ВАША РЕКЛАМА",
+        "ЛУЧШИЙ БРЕНД",
+        "куча дерьма просто чтобы посмотреть как будет выглядеть куча текста который пишут маркетологи мелким шрифтом хз зачем бла блаблаабабаб"
+    ];
+
+    function rotateAds() {
+        let index = 0;
+        setInterval(() => {
+            index = (index + 1) % adTexts.length;
+            
+            const txt1 = document.getElementById('ad-text-1');
+            const txt2 = document.getElementById('ad-text-2');
+            
+            if(txt1) updateAdText(txt1, adTexts[index]);
+            // Второй баннер пусть показывает следующий по списку текст, чтобы они отличались
+            if(txt2) updateAdText(txt2, adTexts[(index + 1) % adTexts.length]);
+            
+        }, 3000); // Смена каждые 3 секунды
+    }
+
+    function updateAdText(element, text) {
+        element.style.opacity = 0; // Плавное затухание
+        setTimeout(() => {
+            element.innerText = text;
+            // Если текст длинный, делаем шрифт мелким
+            if (text.length > 30) {
+                element.classList.add('small-text');
+            } else {
+                element.classList.remove('small-text');
+            }
+            element.style.opacity = 1; // Плавное появление
+        }, 500);
+    }
+
+    rotateAds(); // Запускаем шарманку
+    // ====================================================
 
     let selectedDate = null;
     let selectedNumber = null;
     let activeBookingData = null;
 
-    // Функция для красивого вывода ошибок прямо на кнопки (вместо зависающих alert)
     function showErrorOnButton(btnId, defaultText, errorMsg) {
         const btn = document.getElementById(btnId);
         btn.innerText = "Ошибка: " + errorMsg;
@@ -175,10 +289,8 @@
     function selectDate(clickedBtn, dbDate, nextNumber) {
         document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('selected'));
         clickedBtn.classList.add('selected');
-
         selectedDate = dbDate;
         selectedNumber = nextNumber;
-
         const submitBtn = document.getElementById('submit-btn');
         submitBtn.disabled = false;
         submitBtn.innerText = `Вы будете №${nextNumber}-ым в очереди`;
@@ -206,14 +318,10 @@
                 body: JSON.stringify({ name, surname, contact, target_date: selectedDate })
             });
             
-            // Защита от 500 ошибок (если сервер вернул HTML вместо JSON)
             const textData = await res.text();
             let data;
-            try {
-                data = JSON.parse(textData);
-            } catch(e) {
-                throw new Error("Воркер упал (500)");
-            }
+            try { data = JSON.parse(textData); } 
+            catch(e) { throw new Error("Воркер упал (500)"); }
 
             if (data.success) {
                 localStorage.setItem('mvd_contact', contact);
@@ -222,7 +330,6 @@
                 showErrorOnButton('submit-btn', defaultBtnText, data.error || "Неизвестная ошибка");
             }
         } catch(e) { 
-            // Если вылезла ошибка CORS или интернета
             showErrorOnButton('submit-btn', defaultBtnText, e.message);
         }
     }
